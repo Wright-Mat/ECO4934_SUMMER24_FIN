@@ -65,7 +65,7 @@ library(gbm)
 # Having established which covariates will be used in determining
 # our best prediction model, read in the data.
 
-eclipse_data <- read.csv("C:/ucf_classes/eco_4934/data/Eclipse_Data.csv", sep=',', header=TRUE)
+eclipse_data <- read.csv("ECO4934_SUMMER24_FIN/Data/Eclipse_Data.csv", sep=',', header=TRUE)
 eclipse_data <- subset(eclipse_data, select = -id)
 
 # Now, let's convert our dependent variable into numerical values.
