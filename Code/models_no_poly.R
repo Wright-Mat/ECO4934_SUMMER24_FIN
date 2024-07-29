@@ -2,13 +2,6 @@
 rm(list = ls())
 
 # Import packages.
-install.packages("RSQLite")
-install.packages("glmnet")
-install.packages("randomForest")
-install.packages("gbm")
-library(RSQLite)
-library(DBI)
-
 library(ROCR)
 library(dplyr)
 library(caret)
@@ -16,6 +9,10 @@ library(stargazer)
 library(glmnet)
 library(randomForest)
 library(gbm)
+library(pROC)
+library(ipred)
+library(rpart)
+library(RColorBrewer)
 
 # Next, read in the data (our team edited much of this using 
 # sqlite3 in VSCode). The dependent variable, curr_res, refers
@@ -65,7 +62,7 @@ library(gbm)
 # Having established which covariates will be used in determining
 # our best prediction model, read in the data.
 
-eclipse_data <- read.csv("ECO4934_SUMMER24_FIN/Data/Eclipse_Data.csv", sep=',', header=TRUE)
+eclipse_data <- read.csv("C:/ucf_classes/eco_4934/data/Eclipse_Data.csv", sep=',', header=TRUE)
 eclipse_data <- subset(eclipse_data, select = -id)
 
 # Now, let's convert our dependent variable into numerical values.
@@ -402,6 +399,80 @@ fnr
 # Now, we will move onto bagging and random forest.
 
 set.seed(123456)
+bagging_model <- bagging(curr_res ~., train, nbagg=150, coob = TRUE, control=rpart.control(minsplit=2, cp=0))
+
+bagging_model
+
+# Obtain predictions for bagging_model.
+
+pred_prob_train_bagging <- predict(bagging_model, type = "prob")[,2]
+pred_train_bagging <- prediction(pred_prob_train_bagging, train$curr_res)
+perf_train_bagging <- performance(pred_train_bagging, "tpr", "fpr")
+
+# Calculate the area under the curve.
+
+unlist(slot(performance(pred_train_bagging, "auc"), "y.values"))
+
+
+# Predict with the test data and calculate the auc. 
+
+pred_prob_test_bagging <- predict(bagging_model, newdata = test, type = "prob")[,2]
+pred_test_bagging <- prediction(pred_prob_test_bagging, test$curr_res)
+perf_test_bagging <- performance(pred_test_bagging, "tpr", "fpr")
+
+unlist(slot(performance(pred_test_bagging, "auc"), "y.values"))
+
+
+# Calculate optimal threshold and plot ROC curve.
+
+thresholds <- seq(0.01, 0.99, by = 0.01)
+sensitivity <- numeric(length(thresholds))
+specificity <- numeric(length(thresholds))
+accuracy <- numeric(length(thresholds))
+
+for (i in seq_along(thresholds)) {
+  perf_bagging <- calculate_performance(pred_prob_test_bagging, test$curr_res, thresholds[i])
+  sensitivity[i] <- perf_bagging$sensitivity
+  specificity[i] <- perf_bagging$specificity
+  accuracy[i] <- perf_bagging$accuracy
+}
+
+best_accuracy <- max(accuracy)
+best_sensitivity <- sensitivity[which.max(accuracy)]
+best_specificity <- specificity[which.max(accuracy)]
+
+best_threshold <- thresholds[which.max(accuracy)]
+best_threshold
+
+
+plot(perf_test_bagging, main = "ROC Curve Bagging", colorize = TRUE)
+legend("bottomright", legend = paste("Threshold =", round(best_threshold, 2)), col = "black", lty = 1)
+abline(a=0,b=1)
+
+# Determine the tpr, fpr, tnr, and fnr.
+
+class_prediction_bagging <- ifelse(pred_prob_test_bagging
+                                   > best_threshold, "positive_class", "negative_class")
+
+table(class_prediction_bagging)
+
+confmat <- table(class_prediction_bagging, test$curr_res)
+confmat
+
+tpr <- confmat[2,2]/y[[2]]
+fpr <- confmat[2,1]/y[[1]]
+tnr <- confmat[1,1]/y[[1]]
+fnr <- confmat[1,2]/y[[2]]
+
+tpr
+fpr
+tnr
+fnr
+
+
+# Random Forest.
+
+set.seed(123456)
 RF_model <- randomForest(curr_res ~ ., data = train, ntree = 1000, mtry=5)
 
 RF_model
@@ -455,7 +526,7 @@ plot(perf_test_RF, main = "ROC Curve Random Forest", colorize = TRUE)
 legend("bottomright", legend = paste("Threshold =", round(best_threshold, 2)), col = "black", lty = 1)
 abline(a=0,b=1)
 
-# Determin the tpr, fpr, tnr, and fnr.
+# Determine the tpr, fpr, tnr, and fnr.
 
 class_prediction_RF <- ifelse(pred_prob_test_RF > best_threshold, "positive_class", "negative_class")
 
