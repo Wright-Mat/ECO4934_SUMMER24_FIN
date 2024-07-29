@@ -10,7 +10,7 @@ library(gbm)
 
 #  Read in data.
 
-eclipse_data <- read.csv("~/Project/Data/Eclipse_Data.csv", sep = ',', header = TRUE)
+eclipse_data <- read.csv("ECO4934_SUMMER24_FIN/Data/Eclipse_Data.csv", sep = ',', header = TRUE)
 
 eclipse_data <- subset(eclipse_data, select = -id)
 
